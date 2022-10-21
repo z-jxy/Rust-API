@@ -19,23 +19,10 @@ use diesel::prelude::*;
 use diesel::Queryable;
 use rocket::serde::json::Json;
 use crate::schema::agents;
-
-
-
-//type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
-//
-//pub fn init_pool() -> Pool {
-//    let manager = ConnectionManager::<PgConnection>::new//(database_url());
-//    Pool::new(manager).expect("db pool")
-//}
-//fn database_url() -> String {
-//    env::var("DATABASE_URL").expect("DATABASE_URL must be set")
-//}
+use std::collections::HashMap;
 
 #[database("postgres")]
 struct Db(rocket_sync_db_pools::diesel::PgConnection);
-
-
 
 pub fn establish_conn() -> PgConnection {
     dotenvy::dotenv().ok();
@@ -46,15 +33,6 @@ pub fn establish_conn() -> PgConnection {
     PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}",  database_url))
 }
-//impl<'r> FromRequest<'r> for Db {
-//    type Error = ();
-//    fn from_request(request: &'a Request<'r>) -> request::Outcome<Db, Self::Error> {
-//        match Db.get() {
-//           Ok(conn) => Outcome::Success(Db(conn)),
-//            Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
-//        }
-//    }
-//}
 
 
 // this is to get users from the database
@@ -105,42 +83,6 @@ pub struct NewAgent<'a> {
 }
 
 
-
-//#[rocket::async_trait]
-//impl<'r> FromData<'r> for NewAgent {
-//    type Error = MyError;
-//
-//    async fn from_data(req: &'r Request<'_>, data: Data<'r>) -> data::Outcome<'r, Self> {
-//        /* .. */
-//    }
-//}
-
-//#[rocket::async_trait]
-//impl<'r> FromRequest<'r> for NewAgent {
-//    type Error = ();
-//
-//    fn from_request(request: &'r Request<'_>) -> Outcome<AgentModel, (), ()> {
-//        // This will unconditionally query the database!
-//        let agent = try_outcome!(request.guard::<User>().await);
-//        if agent.agent_id {
-//            Outcome::Success(AgentModel { agent_id })
-//        } else {
-//            Outcome::Forward(())
-//        }
-//    }
-//}
-
-
-//impl NewAgent {
-//    fn from_agent(agent: Agent) -> NewAgent {
-//        NewAgent {
-//            agent_id: agent.agent_id,
-//            agent_pid: agent.agent_pid,
-//            agent_ip: agent.agent_ip,
-//        }
-//    }
-//}
-
 impl Agent {
     pub fn create(agent: Agent, connection: &mut PgConnection) -> QueryResult<Agent> {
         let encrypted_agent = Agent {
@@ -169,49 +111,6 @@ impl Agent {
 }
 
 
-//type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
-
-//pub fn init_pool() -> Pool {
-//    let manager = ConnectionManager::<PgConnection>::new(database_url());
-//    Pool::new(manager).expect("db pool")
-//}
-
-//fn database_url() -> String {
-//    env::var("DATABASE_URL").expect("DATABASE_URL must be //set")
-//}
-
-//pub struct DbConn(pub r2d2::PooledConnection<ConnectionManager<PgConnection>>);
-//
-//impl<'a, 'r> FromRequest<'r> for DbConn {
-//    type Error = ();
-//
-//    fn from_request(request: &'a Request<'r>) -> request::Outcome<DbConn, Self::Error> {
-//        let pool = request.guard::<State<Pool>>()?;
-//        match pool.get() {
-//            Ok(conn) => Outcome::Success(DbConn(conn)),
-//            Err(_) => Outcome::Failure((Status::ServiceUnavailable, ())),
-//        }
-//    }
-
-//impl Deref for DbConn {
-//    type Target = PgConnection;
-//
-//    fn deref(&self) -> &Self::Target {
-//        &self.0
-//    }
-//}
-
-
-//async fn run_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
-//    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-//    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-//    Db::get_one(&rocket).await
-//        .expect("database connection")
-//        .run(|conn: &mut PgConnection | { conn.run_pending_migrations(MIGRATIONS).expect("diesel migrations"); })
-//        .await;
-
-//    rocket
-//}
 #[get("/")]
 fn index() -> &'static str {
     "Hello, world!"
@@ -244,6 +143,44 @@ fn test_reg(new_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     )
 }
 
+//#[get("/checking")]
+//fn apply() -> Json<InsertableAgent> {
+//    let agent_id = "HAHAHA".to_string();
+//    let agent_pid = "4123".to_string();
+//    let agent_ip = "127.0.0.1".to_string();
+//
+//    Json(InsertableAgent { agent_id, agent_pid, agent_ip })
+//}
+
+
+// VIEW AGENTS
+#[get("/view-agents")]
+fn get_agents() -> Json<Vec<AgentModel>> {
+    use crate::schema::agents::dsl::*;
+    let connection: &mut PgConnection = &mut establish_conn();
+
+    let results: Json<Vec<AgentModel>> = agents.load::<AgentModel>(connection)
+        .map(Json)
+        .expect("Error loading agents");
+
+    println!("Found {} agents: \n", results.len());
+
+    return Json(results.into_inner());
+    //leaving annotes bc will prob need to reference for new routes..
+
+    //let mut v: Vec<AgentModel> = Vec::new();
+
+    //for a in results.0 {
+    //    v.push(a);
+    //    //println!("AGENTS DB!: {:#?}", *a);
+    //};
+
+    //return Json(v);
+}
+
+
+
+//LOG AGENTS TO DB   ONLY WAY I COULD GET THIS TO WORK WTF ROCKET
 #[post("/test-submit", data="<db_agent>")]
 fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     use crate::schema::agents::dsl::*;
@@ -261,11 +198,35 @@ fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     println!("agent parsed!");
 
     diesel::insert_into(agents)
-        .values(&_new_agent)
-        .execute(connection);
+    .values(&_new_agent)
+    .execute(connection)
+        .map(Json)
+        .map_err(|_| Status::InternalServerError)
+        .ok();
+
+
+    //match diesel::insert_into((agent))
+
+
+    //TODO: Add error handling
+
+    //use crate::db::diesel::deserialize::Result;
+    //let myError = Some(Status::ServiceUnavailable);
+
+    //let x = Json(
+    //        InsertableAgent { 
+    //            agent_id: ((*db_agent.agent_id)).to_string(), 
+    //            agent_pid: (*db_agent.agent_pid).to_string(), 
+    //            agent_ip: (*db_agent.agent_ip).to_string(),
+    //        }
+    //    );
+    //if Error {
+    //    Json(myError)
+    //}
+
+    //Err(Outcome::Failure((Status::ServiceUnavailable, ())));
     
     println!("logged in db!!!!!");
-
 
     Json(
         InsertableAgent { 
@@ -320,6 +281,7 @@ pub fn stage() -> AdHoc {
                 //create_agent,
                 test_reg,
                 test_db_log,
+                get_agents,
             ]
         )
     })
