@@ -235,17 +235,43 @@ fn apply() -> Json<InsertableAgent> {
 #[post("/submitting", data="<new_agent>")]
 fn test_reg(new_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     let _res = new_agent.into_inner();
-    //Json(_res);
-    //let agent_id = "HAHAHA".to_string();
-    //let agent_pid = "4123".to_string();
-    //let agent_ip = "127.0.0.1".to_string();
-
-    //Json(InsertableAgent { agent_id, agent_pid, agent_ip })
     Json(
         InsertableAgent { 
             agent_id: (_res.agent_id), 
             agent_pid: (_res.agent_pid), 
             agent_ip: (_res.agent_ip),
+        }
+    )
+}
+
+#[post("/test-submit", data="<db_agent>")]
+fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
+    use crate::schema::agents::dsl::*;
+
+    //let _res = db_agent.into_inner();
+    println!("connecting to db..");
+    let connection: &mut PgConnection = &mut establish_conn();
+    println!("connected!");
+
+    let _new_agent = NewAgent {
+        agent_id: &db_agent.agent_id,
+        agent_pid: &db_agent.agent_pid,
+        agent_ip: &db_agent.agent_ip,
+    };
+    println!("agent parsed!");
+
+    diesel::insert_into(agents)
+        .values(&_new_agent)
+        .execute(connection);
+    
+    println!("logged in db!!!!!");
+
+
+    Json(
+        InsertableAgent { 
+            agent_id: ((*db_agent.agent_id)).to_string(), 
+            agent_pid: (*db_agent.agent_pid).to_string(), 
+            agent_ip: (*db_agent.agent_ip).to_string(),
         }
     )
 }
@@ -293,6 +319,7 @@ pub fn stage() -> AdHoc {
                 apply,
                 //create_agent,
                 test_reg,
+                test_db_log,
             ]
         )
     })
