@@ -1,25 +1,41 @@
-//use diesel::pg::PgConnection;
-use r2d2;
-use r2d2::ManageConnection;
-use rocket::data::FromData;
-use rocket::{Request, State, outcome::Outcome};
-use rocket::http::Status;
-use rocket::request::{self, FromRequest};
-use rocket_sync_db_pools::diesel::connection;
-use rocket_sync_db_pools::diesel::r2d2::ConnectionManager;
-use std::env;
-use std::ops::Deref;
-use rocket::{Rocket, Build, Error, FromForm};
-use rocket::fairing::AdHoc;
-use rocket::response::{Debug, status::Created};
-use rocket::serde::{Serialize, Deserialize};
-use rocket::form::Form;
-use diesel;
-use diesel::prelude::*;
-use diesel::Queryable;
-use rocket::serde::json::Json;
+use r2d2::{
+    ManageConnection,
+    self,
+};
+
+use rocket_sync_db_pools::{
+    diesel::{connection, r2d2::ConnectionManager},
+};
+
+use rocket::{
+    data::{ FromData },
+    http::{ Status },
+    request::{ self, FromRequest },
+    fairing::{ AdHoc },
+    response::{ Debug, status::Created },
+    serde::{ Serialize, Deserialize, json::Json },
+    form::{ Form },
+    outcome::{Outcome},
+    Rocket,
+    Build,
+    Error,
+    FromForm,
+    Request,
+    State,
+};
+
+use std::{
+    env,
+    collections::HashMap,
+};
+use diesel::{
+    prelude::*,
+    Queryable,
+    self,
+};
+
 use crate::schema::agents;
-use std::collections::HashMap;
+
 
 #[database("postgres")]
 struct Db(rocket_sync_db_pools::diesel::PgConnection);
@@ -143,17 +159,8 @@ fn test_reg(new_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     )
 }
 
-//#[get("/checking")]
-//fn apply() -> Json<InsertableAgent> {
-//    let agent_id = "HAHAHA".to_string();
-//    let agent_pid = "4123".to_string();
-//    let agent_ip = "127.0.0.1".to_string();
-//
-//    Json(InsertableAgent { agent_id, agent_pid, agent_ip })
-//}
-
-
 // VIEW AGENTS
+
 #[get("/view-agents")]
 fn get_agents() -> Json<Vec<AgentModel>> {
     use crate::schema::agents::dsl::*;
@@ -163,40 +170,30 @@ fn get_agents() -> Json<Vec<AgentModel>> {
         .map(Json)
         .expect("Error loading agents");
 
-    println!("Found {} agents: \n", results.len());
+    println!("[+] SUCCESS \nFound {} agents. \n", results.len());
 
     return Json(results.into_inner());
-    //leaving annotes bc will prob need to reference for new routes..
 
-    //let mut v: Vec<AgentModel> = Vec::new();
-
-    //for a in results.0 {
-    //    v.push(a);
-    //    //println!("AGENTS DB!: {:#?}", *a);
-    //};
-
-    //return Json(v);
 }
 
+//LOG AGENTS TO DB
 
-
-//LOG AGENTS TO DB   ONLY WAY I COULD GET THIS TO WORK WTF ROCKET
 #[post("/test-submit", data="<db_agent>")]
 fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     use crate::schema::agents::dsl::*;
 
-    //let _res = db_agent.into_inner();
-    println!("connecting to db..");
+    // connecting to db
     let connection: &mut PgConnection = &mut establish_conn();
-    println!("connected!");
+
 
     let _new_agent = NewAgent {
         agent_id: &db_agent.agent_id,
         agent_pid: &db_agent.agent_pid,
         agent_ip: &db_agent.agent_ip,
     };
-    println!("agent parsed!");
-
+    println!("agent data parsed!");
+    
+    //TODO: Add better error handling
     diesel::insert_into(agents)
     .values(&_new_agent)
     .execute(connection)
@@ -204,28 +201,6 @@ fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
         .map_err(|_| Status::InternalServerError)
         .ok();
 
-
-    //match diesel::insert_into((agent))
-
-
-    //TODO: Add error handling
-
-    //use crate::db::diesel::deserialize::Result;
-    //let myError = Some(Status::ServiceUnavailable);
-
-    //let x = Json(
-    //        InsertableAgent { 
-    //            agent_id: ((*db_agent.agent_id)).to_string(), 
-    //            agent_pid: (*db_agent.agent_pid).to_string(), 
-    //            agent_ip: (*db_agent.agent_ip).to_string(),
-    //        }
-    //    );
-    //if Error {
-    //    Json(myError)
-    //}
-
-    //Err(Outcome::Failure((Status::ServiceUnavailable, ())));
-    
     println!("logged in db!!!!!");
 
     Json(
@@ -238,32 +213,7 @@ fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
 }
 
 
-//#[post("/reg", format="application/json", data = "<agent>")]
-//fn create(agent: Json<Agent>, connection: &mut diesel::PgConnection) -> Result<Json<Agent>, Status> {
-//    Agent::create(agent.into_inner(), connection)
-//        .map(Json)
-//        .map_err(|_| Status::InternalServerError);
-//        Ok(Outcome::Success("YAY"));
-//        Err(Outcome::Failure((Status::ServiceUnavailable, ())));
-//}
 
-//#[post("/reg", data = "<newagent>")]
-//pub fn create_agent(newagent: NewAgent<'r> ) {
-//    println!("creating agent!: {:#?}", agent);
-//    use crate::schema::agents::dsl::*;
-//
-//    let connection: &mut PgConnection = &mut establish_conn();
-//
-//    let new_agent = NewAgent {
-//        agent_id: &agent.agent_id,
-//        agent_pid: &agent.agent_pid,
-//        agent_ip: &agent.agent_ip,
-//    };
-//
-//    diesel::insert_into(agents)
-//        .values(&new_agent)
-//        .execute(connection);
-//}
 
 pub fn stage() -> AdHoc {
     AdHoc::on_ignite("Diesel Stage", |rocket| async {

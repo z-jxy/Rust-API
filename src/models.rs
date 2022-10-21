@@ -60,3 +60,67 @@ impl Agent {
         }
     }
 }
+
+//TESTING
+
+// routes?
+
+//#[post("/reg", format="application/json", data = "<agent>")]
+//fn create(agent: Json<Agent>, connection: &mut diesel::PgConnection) -> Result<Json<Agent>, Status> {
+//    Agent::create(agent.into_inner(), connection)
+//        .map(Json)
+//        .map_err(|_| Status::InternalServerError);
+//        Ok(Outcome::Success("YAY"));
+//        Err(Outcome::Failure((Status::ServiceUnavailable, ())));
+//}
+
+//#[post("/reg", data = "<newagent>")]
+//pub fn create_agent(newagent: NewAgent<'r> ) {
+//    println!("creating agent!: {:#?}", agent);
+//    use crate::schema::agents::dsl::*;
+//
+//    let connection: &mut PgConnection = &mut establish_conn();
+//
+//    let new_agent = NewAgent {
+//        agent_id: &agent.agent_id,
+//        agent_pid: &agent.agent_pid,
+//        agent_ip: &agent.agent_ip,
+//    };
+//
+//    diesel::insert_into(agents)
+//        .values(&new_agent)
+//        .execute(connection);
+//}
+
+// error handler ?
+
+
+    //use crate::db::diesel::deserialize::Result;
+    //let myError = Some(Status::ServiceUnavailable);
+
+    //let x = Json(
+    //        InsertableAgent { 
+    //            agent_id: ((*db_agent.agent_id)).to_string(), 
+    //            agent_pid: (*db_agent.agent_pid).to_string(), 
+    //            agent_ip: (*db_agent.agent_ip).to_string(),
+    //        }
+    //    );
+    //if Error {
+    //    Json(myError)
+    //}
+
+    //Err(Outcome::Failure((Status::ServiceUnavailable, ())));
+
+
+// RETURNING ITEMS FROM DB
+
+    //leaving annotes bc will prob need to reference for new routes..
+
+    //let mut v: Vec<AgentModel> = Vec::new();
+
+    //for a in results.0 {
+    //    v.push(a);
+    //    //println!("AGENTS DB!: {:#?}", *a);
+    //};
+
+    //return Json(v);
