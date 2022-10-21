@@ -1,0 +1,17 @@
+[package]
+name = "api_v2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = { version = "0.5.0-rc.2", features = ["json"] }
+r2d2 = "0.8.10"
+diesel = { version = "2.0.0", features = ["postgres", "r2d2", "serde_json"] }
+diesel_migrations = "2.0.0"
+dotenvy = "0.15.6"
+serde = { version = "1.0", features = ["derive"] }
+
+
+[dependencies.rocket_sync_db_pools]
+version = "0.1.0-rc.2"
+features = ["diesel_postgres_pool"]

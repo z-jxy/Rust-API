@@ -1,0 +1,2 @@
+[global.databases.postgres]
+url = "postgresql://Admin:ArmorAdmin123@localhost:5432/postgres"
