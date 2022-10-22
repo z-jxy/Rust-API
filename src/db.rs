@@ -32,9 +32,10 @@ use diesel::{
     prelude::*,
     Queryable,
     self,
+    Identifiable, query_dsl::methods::FilterDsl, associations::HasTable,
 };
 
-use crate::schema::agents;
+use crate::schema::{agents, self};
 
 
 #[database("postgres")]
@@ -52,7 +53,7 @@ pub fn establish_conn() -> PgConnection {
 
 
 // this is to get users from the database
-#[derive(Serialize, Clone, Deserialize, Debug, Queryable, FromForm)]
+#[derive(Serialize, Clone, Deserialize, Debug, Queryable, FromForm, Identifiable)]
 #[serde(crate = "rocket::serde")] 
 pub struct Agent {
     pub id: i32,
@@ -81,7 +82,7 @@ impl InsertableAgent {
 
 
 
-#[derive(Debug, Queryable, AsChangeset, FromForm, Serialize, Deserialize)]
+#[derive(Debug, Queryable, AsChangeset, FromForm, Serialize, Deserialize, Identifiable)]
 #[table_name = "agents"]
 pub struct AgentModel {
     pub id: i32,
@@ -111,19 +112,33 @@ impl Agent {
         agents::table.order(agents::id.desc()).first(connection)
     }
 
-    pub fn get_by_agent_id_and_pid(agent_id_: String, password_: String, connection: &mut PgConnection) -> Option<Agent> {
-        let res = agents::table
-            .filter(agents::agent_id.eq(agent_id_))
-            .get_result::<Agent>(connection);
-        match res {
-            Ok(agent) => {
-                        return Some(agent)
-                    }
-            Err(_) => {
-                None
-            }
-        }
-    }
+    //pub fn get_by_agent_id_and_pid(agent_id_: String, password_: String, connection: &//mut PgConnection) -> Option<Agent> {
+    //    let res = agents::table
+    //        .filter(agents::agent_id.eq(agent_id_))
+    //        .get_result::<Agent>(connection);
+    //    match res {
+    //        Ok(agent) => {
+    //                    return Some(agent)
+    //                }
+    //        Err(_) => {
+    //            None
+    //        }
+    //    }
+    //}
+//
+    //pub fn get_by_agent_id(agent_id_: String, connection: &mut PgConnection) -> //Option<Agent> {
+    //    let res: Result<Agent, Error> = agents::table
+    //        .filter(agents::agent_id.eq(agent_id_))
+    //        .get_result::<Agent>(connection);
+    //    match res {
+    //        Ok(agent) => {
+    //                    return Some(agent)
+    //                }
+    //        Err(_) => {
+    //            None
+    //        }
+    //    }
+    //}
 }
 
 
@@ -214,6 +229,33 @@ fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
 
 
 
+#[delete("/remove-agent/<target_id>")]
+fn remove_agent(target_id: String) {
+    
+    let agent_id_: String = target_id;
+    
+    use crate::schema::agents::dsl::*;
+    // connecting to db
+    
+    println!("agent data parsed!");
+  
+    let connection: &mut PgConnection = &mut establish_conn();
+    let agent_deleted = diesel::delete(agents)
+    .filter(agent_id.like(&agent_id_))
+    .execute(connection)
+    .expect("ERrrror!");
+
+    //Ok(())
+    
+    println!("agent removed: {:#?}", agent_deleted);
+
+    //format!("Successfully removed agent: {:#?} from db.", target_id)
+}
+
+
+
+
+
 
 pub fn stage() -> AdHoc {
     AdHoc::on_ignite("Diesel Stage", |rocket| async {
@@ -232,6 +274,7 @@ pub fn stage() -> AdHoc {
                 test_reg,
                 test_db_log,
                 get_agents,
+                remove_agent,
             ]
         )
     })
