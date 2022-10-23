@@ -2,6 +2,7 @@ use r2d2::{
     ManageConnection,
     self,
 };
+use chrono::{DateTime, Utc};
 
 use rocket_sync_db_pools::{
     diesel::{connection, r2d2::ConnectionManager},
@@ -13,7 +14,7 @@ use rocket::{
     request::{ self, FromRequest },
     fairing::{ AdHoc },
     response::{ Debug, status::Created },
-    serde::{ Serialize, Deserialize, json::Json },
+    serde::{ Serialize, Deserialize, json::Json, ser::{SerializeSeq, SerializeStruct}, Serializer },
     form::{ Form },
     outcome::{Outcome},
     Rocket,
@@ -35,8 +36,8 @@ use diesel::{
     Identifiable, query_dsl::methods::FilterDsl, associations::HasTable,
 };
 
-use crate::schema::{agents, self};
-
+use crate::schema::{agents};
+use crate::schema::{errands};
 
 #[database("postgres")]
 struct Db(rocket_sync_db_pools::diesel::PgConnection);
@@ -80,7 +81,74 @@ impl InsertableAgent {
     }
 }
 
+pub struct Args {
+    arguments: Vec<String>
+}
 
+
+#[derive(Debug, Clone, Deserialize, Serialize, FromForm)]
+pub struct C2TaskModel {
+    pub id: i32,
+    //pub created_at: DateTime<Utc>,
+    //pub executed_at: Option<DateTime<Utc>>,
+    pub task: String,
+    pub args: Vec<String>,
+    pub result: Option<String>,
+
+    pub implant_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, FromForm)]
+pub struct NewC2Task {
+    pub task: String,
+    pub args: Vec<String>,
+
+    pub implant_id: String,
+}
+
+#[derive(Debug)]
+pub enum C2Tasks {
+    Args(Vec<String>),
+    IsArgs(String),
+    CreatedAt(DateTime<Utc>),
+}
+
+impl Serialize for C2Tasks {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        match self {
+            C2Tasks::Args(ref list) => {
+                let mut seq = serializer.serialize_seq(Some(list.len()))?;
+                for element in list {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+            C2Tasks::IsArgs(ref arg_) => {
+                serializer.serialize_str(arg_)
+            }
+            C2Tasks::CreatedAt(ref time_) => {
+                serializer.serialize_str(&time_.to_string())
+            }
+        }
+    }
+}
+
+
+//#[derive(Debug, Clone, Queryable)]
+//#[table_name = "errands"]
+//pub struct Errand {
+//    pub id: i32,
+//    pub created_at: DateTime<Utc>,
+//    pub executed_at: Option<DateTime<Utc>>,
+//    pub command: String,
+//    pub args: Json<Vec<String>>,
+//    pub output: Option<String>,
+//
+//    pub agent_id: String,
+//}
 
 #[derive(Debug, Queryable, AsChangeset, FromForm, Serialize, Deserialize, Identifiable)]
 #[table_name = "agents"]
@@ -141,6 +209,7 @@ impl Agent {
     //}
 }
 
+// TESTING
 
 #[get("/")]
 fn index() -> &'static str {
@@ -174,8 +243,20 @@ fn test_reg(new_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     )
 }
 
-// VIEW AGENTS
+#[post("/new/task", data="<new_task>")]
+fn test_tasks(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
+    let _res = new_task.into_inner();
+    Json( NewC2Task { 
+        task: (_res.task), 
+        args: (_res.args), 
+        implant_id: (_res.implant_id) })
+}
 
+
+// END OF TESTING
+
+
+// VIEW AGENTS
 #[get("/view-agents")]
 fn get_agents() -> Json<Vec<AgentModel>> {
     use crate::schema::agents::dsl::*;
@@ -192,9 +273,8 @@ fn get_agents() -> Json<Vec<AgentModel>> {
 }
 
 //LOG AGENTS TO DB
-
-#[post("/test-submit", data="<db_agent>")]
-fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
+#[post("/register", data="<db_agent>")]
+fn register_agent(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
     use crate::schema::agents::dsl::*;
 
     // connecting to db
@@ -228,16 +308,11 @@ fn test_db_log(db_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
 }
 
 
-
+// Remove Agents
 #[delete("/remove-agent/<target_id>")]
 fn remove_agent(target_id: String) {
-    
     let agent_id_: String = target_id;
-    
     use crate::schema::agents::dsl::*;
-    // connecting to db
-    
-    println!("agent data parsed!");
   
     let connection: &mut PgConnection = &mut establish_conn();
     let agent_deleted = diesel::delete(agents)
@@ -245,8 +320,6 @@ fn remove_agent(target_id: String) {
     .execute(connection)
     .expect("ERrrror!");
 
-    //Ok(())
-    
     println!("agent removed: {:#?}", agent_deleted);
 
     //format!("Successfully removed agent: {:#?} from db.", target_id)
@@ -256,25 +329,19 @@ fn remove_agent(target_id: String) {
 
 
 
-
 pub fn stage() -> AdHoc {
-    AdHoc::on_ignite("Diesel Stage", |rocket| async {
+    AdHoc::on_ignite("Diesel Stage", |rocket: Rocket<Build> | async {
         rocket.attach(Db::fairing())
             //.attach(AdHoc::try_on_ignite("Diesel Migrations", run_migrations))
             .mount("/api", routes![
-                //list, 
-                //create, 
-                //read, 
-                //delete, 
-                //destroy
                 index,
                 test,
                 apply,
-                //create_agent,
                 test_reg,
-                test_db_log,
+                register_agent,
                 get_agents,
                 remove_agent,
+                test_tasks,
             ]
         )
     })

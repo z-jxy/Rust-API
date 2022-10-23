@@ -1,7 +1,11 @@
 -- Your SQL goes here
 CREATE TABLE errands (
 	id          SERIAL PRIMARY KEY,
-	task        VARCHAR(200) NOT NULL,
-	result      VARCHAR(200) NOT NULL,
-	time_stamp  VARCHAR(20) NOT NULL
+	created_at	TIMESTAMP WITH TIME ZONE NOT NULL,
+	executed_at	TIMESTAMP WITH TIME ZONE NOT NULL,
+	task        TEXT NOT NULL,
+	args		JSONB NOT NULL,
+	result      TEXT
 );
+
+CREATE INDEX index_errands_on_agent_id ON errands (agent_id)

@@ -4,6 +4,8 @@
 mod db;
 //mod models;
 pub mod schema;
+//pub mod structs;
+pub mod api_models;
 
 #[launch]
 fn rocket() -> _ {
