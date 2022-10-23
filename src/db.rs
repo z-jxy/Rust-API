@@ -13,21 +13,22 @@ use rocket::{
     http::{ Status },
     request::{ self, FromRequest },
     fairing::{ AdHoc },
-    response::{ Debug, status::Created },
+    response::{ Debug, status::Created, stream::{EventStream, Event} },
     serde::{ Serialize, Deserialize, json::Json, ser::{SerializeSeq, SerializeStruct}, Serializer },
     form::{ Form },
     outcome::{Outcome},
+    fs::{relative, FileServer,},
     Rocket,
     Build,
     Error,
     FromForm,
     Request,
-    State, time::{OffsetDateTime, macros::{datetime, date}, Date}, tokio::net::{TcpListener, unix::SocketAddr},
+    State, time::{OffsetDateTime, macros::{datetime, date}, Date}, tokio::{net::{TcpListener, unix::SocketAddr,}, sync::broadcast::{Sender, error::RecvError, channel}, select}, Shutdown,
 };
 
 use std::{
     env,
-    collections::HashMap, time::SystemTime, net::{Ipv4Addr, SocketAddrV4},
+    collections::HashMap, time::SystemTime, net::{Ipv4Addr, SocketAddrV4}, sync::atomic::{AtomicUsize, Ordering},
 };
 use diesel::{
     prelude::*,
@@ -36,7 +37,7 @@ use diesel::{
     Identifiable, query_dsl::methods::FilterDsl, associations::HasTable,
 };
 
-use crate::{schema::{agents}, api_models::{ListenerModel}};
+use crate::{schema::{agents}, api_models::{ListenerModel, Message}};
 use crate::schema::{errands};
 
 #[database("postgres")]
@@ -80,6 +81,9 @@ impl InsertableAgent {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, FromForm, Clone)]
+pub struct C2Client(pub usize);
 
 pub struct Args {
     arguments: Vec<String>
@@ -262,7 +266,7 @@ fn test_time(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
         implant_id: (_res.implant_id) })
 }
 
-
+//TODO: Fix panic on shutdown
 #[post("/new-listener", data="<z>")]
 async fn create_listener(z: Form<ListenerModel> ) -> std::io::Result<()> {
     let x = z.into_inner();
@@ -276,7 +280,6 @@ async fn create_listener(z: Form<ListenerModel> ) -> std::io::Result<()> {
 
     let listener: TcpListener = TcpListener::bind(listener_).await?;
     match listener.accept().await {
-
         Ok((_socket, addr)) => println!("new client: {:?}", addr),
         Err(e) => println!("couldn't get client: {:?}", e),
     }
@@ -298,6 +301,54 @@ async fn create_listener(z: Form<ListenerModel> ) -> std::io::Result<()> {
 //
 //    Ok(())
 //}
+
+
+// Chat room 
+
+static USER_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+#[get("/events")]
+async fn events(queue: &State<Sender<Message>>, mut end: Shutdown) -> EventStream![] {
+    let mut rx = queue.subscribe();
+    EventStream! {
+        loop {
+            let msg = select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => msg,
+                    Err(RecvError::Closed) => break,
+                    Err(RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+
+            yield Event::json(&msg);
+        }
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for &'r C2Client {
+    type Error = ();
+
+    async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
+        request::Outcome::Success(request.local_cache(|| {
+            C2Client(USER_COUNTER.fetch_add(1, Ordering::Relaxed))
+        }))
+    }
+}
+
+#[post("/message", data = "<form>")]
+fn post_message(form: Form<Message>, queue: &State<Sender<Message>>) {
+    let _res = queue.send(form.into_inner());
+}
+
+#[get("/chat-users")]
+fn c2_users(id: &C2Client) -> Json<usize> {
+    Json(id.0)
+}
+
+
+
 
 // END OF TESTING
 
@@ -379,18 +430,29 @@ pub fn stage() -> AdHoc {
     AdHoc::on_ignite("Diesel Stage", |rocket: Rocket<Build> | async {
         rocket.attach(Db::fairing())
             //.attach(AdHoc::try_on_ignite("Diesel Migrations", run_migrations))
+            .manage(channel::<Message>(1024).0)
             .mount("/api", routes![
+                // opsec
                 index,
                 test,
                 apply,
                 test_reg,
+                // implant handling
                 register_agent,
                 get_agents,
                 remove_agent,
+                // task handling
                 test_tasks,
                 test_time,
+                // listener handling
                 create_listener,
+                // C2 Operations handling
+                events,
+                post_message,
+                c2_users,
+
             ]
         )
+        .mount("/", FileServer::from(relative!("static")))
     })
 }
