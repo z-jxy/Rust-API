@@ -2,7 +2,7 @@ use r2d2::{
     ManageConnection,
     self,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDateTime};
 
 use rocket_sync_db_pools::{
     diesel::{connection, r2d2::ConnectionManager},
@@ -22,12 +22,12 @@ use rocket::{
     Error,
     FromForm,
     Request,
-    State,
+    State, time::{OffsetDateTime, macros::{datetime, date}, Date}, tokio::net::{TcpListener, unix::SocketAddr},
 };
 
 use std::{
     env,
-    collections::HashMap,
+    collections::HashMap, time::SystemTime, net::{Ipv4Addr, SocketAddrV4},
 };
 use diesel::{
     prelude::*,
@@ -36,7 +36,7 @@ use diesel::{
     Identifiable, query_dsl::methods::FilterDsl, associations::HasTable,
 };
 
-use crate::schema::{agents};
+use crate::{schema::{agents}, api_models::{ListenerModel}};
 use crate::schema::{errands};
 
 #[database("postgres")]
@@ -84,7 +84,6 @@ impl InsertableAgent {
 pub struct Args {
     arguments: Vec<String>
 }
-
 
 #[derive(Debug, Clone, Deserialize, Serialize, FromForm)]
 pub struct C2TaskModel {
@@ -252,6 +251,53 @@ fn test_tasks(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
         implant_id: (_res.implant_id) })
 }
 
+#[post("/timestamp", data="<new_task>")]
+fn test_time(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
+    let _res = new_task.into_inner();
+    println!("{:?}", chrono::offset::Local::now());
+
+    Json( NewC2Task { 
+        task: (_res.task), 
+        args: (_res.args), 
+        implant_id: (_res.implant_id) })
+}
+
+
+#[post("/new-listener", data="<z>")]
+async fn create_listener(z: Form<ListenerModel> ) -> std::io::Result<()> {
+    let x = z.into_inner();
+
+    let mut listener_ = String::new();
+
+    listener_.push_str(&String::from(x.lhost));
+    listener_.push_str(&String::from(x.lport));
+
+    println!("Listening on host {:#?}", listener_);
+
+    let listener: TcpListener = TcpListener::bind(listener_).await?;
+    match listener.accept().await {
+
+        Ok((_socket, addr)) => println!("new client: {:?}", addr),
+        Err(e) => println!("couldn't get client: {:?}", e),
+    }
+    
+
+    Ok(())
+}
+
+//#[delete("/new-listener")]
+//async fn create_listener() -> std::io::Result<()> {
+//    let target_listener = 
+//
+//    drop(&target_listener);
+//
+//    match listener.accept().await {
+//        Ok((_socket, addr)) => println!("new client: {:?}", addr),
+//        Err(e) => println!("couldn't get client: {:?}", e),
+//    }
+//
+//    Ok(())
+//}
 
 // END OF TESTING
 
@@ -342,6 +388,8 @@ pub fn stage() -> AdHoc {
                 get_agents,
                 remove_agent,
                 test_tasks,
+                test_time,
+                create_listener,
             ]
         )
     })
