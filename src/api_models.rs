@@ -25,22 +25,6 @@ pub struct NewC2Task {
     pub implant_id: String,
 }
 
-
-
-//#[derive(Debug)]
-//pub struct NewListener<'a, T: ?Sized> {
-//    pub lhost: &'a String,
-//    pub lport: &'a String,
-//}
-//
-//impl<'a, T: ?Sized> From<&'a T> for NewListener<'a, T> {
-//    fn from(s: &'a T) -> Self {
-//        NewListener { lhost: (), lport: () }
-//    }
-//}
-
-
-
 #[derive(Debug, Clone, Serialize, Deserialize, FromForm)]
 pub struct ListenerModel {
     pub lhost: String,
@@ -57,13 +41,3 @@ pub struct Message {
     pub username: String,
     pub message: String,
 }
-
-
-//#[derive(Debug, FromForm)]
-//pub struct ListenerModel<'a, T: ?Sized>(&'a T);
-//
-//impl<'a, T: ?Sized> From<&'a T> for ListenerModel<'a, T> {
-//    fn from(s: &'a T) -> Self {
-//        ListenerModel(s)
-//    }
-//}
