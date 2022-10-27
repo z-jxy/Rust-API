@@ -1,6 +1,9 @@
-When setting up the docker instance, may need to connect into the container to setup the user
+# Work in progress 
 
-//TODOs: 
+## Current features
+
+
+## //TODOs: 
 
 - [X] -Set up [get agents from db]
 - [X] -Set up [create agents to db]
