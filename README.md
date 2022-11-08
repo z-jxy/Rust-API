@@ -1,7 +1,4 @@
-# Work in progress 
-
-## Current features
-
+# Work in progress (NOT READY FOR USE)
 
 ## //TODOs: 
 
